@@ -1,5 +1,6 @@
 # Pronoun Proxy
 A simple SOCKS5 proxy server that changes gendered pronouns to those of another gender.
+Written as a coding task for an assignment to a summer internship. I also used this as an excuse to teach myself how to use coroutines and Python's `asyncio` module.
 
 ## Requirements
 * Python 3.5 or later (uses coroutines with `async / await` syntax)

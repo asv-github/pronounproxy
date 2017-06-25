@@ -53,7 +53,6 @@ async def handle_socks_client(client_reader, client_writer):
 				copy_stream(client_reader, dest_writer),
 				copy_stream(dest_reader, client_writer, line_filter=swap_pronouns)
 			)
-			# FIXME There's a bug where if the destination closes the connection the client's connection doesn't get closed right away
 		finally:
 			dest_writer.close()
 	finally:
@@ -73,7 +72,7 @@ if __name__ == "__main__":
 	loop = asyncio.get_event_loop()
 	loop.set_debug(True)
 	server = loop.run_until_complete(asyncio.start_server(handle_socks_client, '127.0.0.1', 1080, loop=loop))
-	print("Server listening on port 1080. (pid %d)" % os.getpid())
+	print("Server listening on port 1080. (pid %d)" % getpid())
 	try:
 		loop.run_forever()
 	except:

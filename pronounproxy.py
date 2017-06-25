@@ -1,16 +1,15 @@
 import asyncio, re
+from os import getpid
 import s5
-
-import logging; logging.basicConfig(level=logging.DEBUG) # XXX
 
 """
 Pronoun Proxy: A simple SOCKS5 proxy server that changes gendered pronouns to those of another gender. Listens on port 1080.
 
 Current limitations / bugs:
 * Assumes the stream we're proxying uses a line-based protocol (which seems reasonable given that we're manipulating English text)
-* Ctrl-C is not properly handled -- server must be killed manually by PID
+* Ctrl-C is not properly handled if there is an open connection -- server must be killed manually by PID
 * Currently supports only CONNECT requests (and not BIND or UDP ASSOCIATE)
-* Connection to client is not always closed when the connection to the destination closes
+* Connection to client is not always closed immediately when the connection to the destination closes
 """
 
 
@@ -28,7 +27,7 @@ pronoun_map.update(
 	[(a.title(), b.title()) for a,b in pronoun_map.items()]
 )
 # Make a regex that looks like "\b(he|him|...)\b"
-pronoun_regex = rb"\b(" + b"|".join(pronoun_map.keys()) + rb")\b"
+pronoun_regex = b"\\b(" + b"|".join(pronoun_map.keys()) + b")\\b"
 def swap_pronouns(line):
 	return re.sub(
 		pronoun_regex,
@@ -39,10 +38,9 @@ def swap_pronouns(line):
 async def handle_socks_client(client_reader, client_writer):
 	"""
 	Deal with a SOCKS5 client that has connected to us.
-	First we handle the initial SOCKS5 negotiation and connect to the requested destination.
+	First we have s5.handle_socks5 handle the initial SOCKS5 negotiation and connect to the requested destination.
 	Then we set up proxying between the client and the destination, copying everything one sends and passing it along to the other (after changing the text a bit).
 	"""
-
 	try:
 		reader_writer_pair = await s5.handle_socks5(client_reader, client_writer) # Returns a reader writer pair or False on error
 		if not reader_writer_pair:
@@ -55,11 +53,9 @@ async def handle_socks_client(client_reader, client_writer):
 				copy_stream(client_reader, dest_writer),
 				copy_stream(dest_reader, client_writer, line_filter=swap_pronouns)
 			)
-			# FIXME There's a bug where if the destination closes the connection the client's connection doesn't get closed
+			# FIXME There's a bug where if the destination closes the connection the client's connection doesn't get closed right away
 		finally:
 			dest_writer.close()
-	except BaseException as e:
-		print("Protocol error, closing connection (%s)" % e)
 	finally:
 		client_writer.close()
 
@@ -71,21 +67,16 @@ async def copy_stream(reader, writer, line_filter=(lambda x: x)):
 		if not line:
 			writer.write_eof()
 			break
-		if line.strip() == b"ERROR": #XXX
-			raise IOError()
-		if line.strip() == b"QUIT": #XXX
-			writer.write_eof()
-			break
 		writer.write(line_filter(line))
-	print("copy_stream exiting")
 
-loop = asyncio.get_event_loop()
-loop.set_debug(True)
-server = loop.run_until_complete(asyncio.start_server(handle_socks_client, '127.0.0.1', 1080, loop=loop))
-print("Server listening on port 1080.")
-try:
-	loop.run_forever()
-except:
-	pass
-server.close()
-loop.close()
+if __name__ == "__main__":
+	loop = asyncio.get_event_loop()
+	loop.set_debug(True)
+	server = loop.run_until_complete(asyncio.start_server(handle_socks_client, '127.0.0.1', 1080, loop=loop))
+	print("Server listening on port 1080. (pid %d)" % os.getpid())
+	try:
+		loop.run_forever()
+	except:
+		pass
+	server.close()
+	loop.close()

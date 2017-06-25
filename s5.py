@@ -129,13 +129,3 @@ async def handle_socks5(reader, writer):
 	except ValueError as e:
 		print("Protocol error: %s" % e)
 		return False
-
-if __name__ == "__main__":
-	loop = asyncio.get_event_loop()
-	reader, writer = loop.run_until_complete(asyncio.open_connection("localhost","12345"))
-	#print(loop.run_until_complete(read_pstring(reader)))
-	destr_destw = loop.run_until_complete(handle_socks5(reader, writer))
-	if not destr_destw:
-		writer.close()
-		exit()
-	
